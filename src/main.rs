@@ -59,12 +59,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .send()
             .await?;
 
+        let code_str = resp.status().as_u16();
+        let other_code = format!("Some other code: {}", code_str);
+        let code_msg: &str = match resp.status().as_u16() {
+            400 => "400 Bad Request",
+            401 => "401 Unauthorized",
+            403 => "403 Forbidden",
+            404 => "404 Not Found",
+            405 => "405 Method Not Allowed",
+            408 => "408 Request Timeout",
+            418 => "418 I'm a teapot",
+            429 => "429 Too Many Requests",
+            500 => "500 Internal Server Error",
+            501 => "501 Not Implemented",
+            503 => "503 Service Unavailable",
+            504 => "504 Gateway Timeout",
+            _ => other_code.as_str(),
+        };
         if resp.status().is_client_error() {
-            println!("Nope.");
+            println!("Nope. ({})", &code_msg);
             guesses.push(s);
         }
         else if resp.status().is_server_error() {
-            println!("Someone fucked the server");
+
+            println!("Someone fucked the server. ({})", &code_msg);
         }
         else {
             println!("HOLY SHIT. PASSWORD: {}", &s);
