@@ -1,13 +1,23 @@
+mod app;
+mod event;
+mod ui;
+
+use crate::app::App;
+use crate::event::{Event, Events};
+use crossterm::{
+    event::{
+        Event as CEvent,
+        KeyCode,
+        KeyModifiers},
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 use reqwest;
 use std::{
+    error::Error,
     fs::{File, OpenOptions},
-    io::{self, prelude::*, BufReader, Write},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering}
-    }
+    io::{self, prelude::*, stdout, BufReader, Write},
 };
-use text_io::try_read;
+use tui::{backend::CrosstermBackend, Terminal};
 
 fn read_guesses() -> io::Result<Vec<String>> {
     BufReader::new(File::open("guesses.txt")?).lines().collect()
@@ -26,69 +36,101 @@ fn write_guesses(guesses: Vec<String>) -> io::Result<()> {
     Ok(())
 }
 
+async fn request(client: reqwest::Client, app: &mut App)
+    -> Result<(), Box<dyn Error>> {
+    let guess: String = app.input.drain(..).collect();
+    if app.guesses.contains(&guess) {
+        app.last_return = "Already guessed, dipshit.".to_string();
+        return Ok(())
+    }
+    let resp = client.post("https://completethecodetwo.cards/pw")
+        .body(guess.to_owned())
+        .header("Content-Type", "text/plain")
+        .send()
+        .await?;
+
+
+
+    let code_str = resp.status().as_str().to_string();
+
+    let other_code = format!("No fucking clue. {}", code_str);
+    let code_msg: &str = match resp.status().as_u16() {
+        400 => "Nope. 400 Bad Request",
+        401 => "Nope. 401 Unauthorized",
+        403 => "Nope. 403 Forbidden",
+        404 => "Nope. 404 Not Found",
+        405 => "Nope. 405 Method Not Allowed",
+        408 => "Nope. 408 Request Timeout",
+        418 => "The fuck? 418 I'm a teapot",
+        429 => "You fucked up. 429 Too Many Requests",
+        500 => "It's dead, Jim. 500 Internal Server Error",
+        501 => "The fuck? 501 Not Implemented",
+        503 => "It's dead, Jim. 503 Service Unavailable",
+        504 => "It's dead, Jim. 504 Gateway Timeout",
+        _ => other_code.as_str(),
+    };
+
+    app.last_return = code_msg.to_string();
+
+    if resp.status().is_client_error() {
+        app.guesses.push(guess);
+        write_guesses(app.guesses.to_owned())?;
+    }
+    Ok(())
+}
+
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
-    let mut guesses: Vec<String> = match read_guesses() {
+    let guesses: Vec<String> = match read_guesses() {
         Ok(g) => g,
         Err(_) => Vec::new()
     };
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
 
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-        ::std::process::exit(0);
-    })?;
-    while running.load(Ordering::SeqCst) {
-        print!("> ");
-        io::stdout().flush()?;
-        let mut s: String = try_read!("{}\n")?;
-        s = s.trim().to_string();
-        if s.is_empty() {
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            continue
-        }
-        else if guesses.contains(&s) {
-            println!("Already guessed, dipshit.");
-            continue
-        }
+    enable_raw_mode()?;
+    let stdout = stdout();
 
-        let resp = client.post("https://completethecodetwo.cards/pw")
-            .body(s.to_owned())
-            .header("Content-Type", "text/plain")
-            .send()
-            .await?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    let events = Events::new();
+    let mut app = App::new(guesses);
 
-        let code_str = resp.status().as_u16();
-        let other_code = format!("Some other code: {}", code_str);
-        let code_msg: &str = match resp.status().as_u16() {
-            400 => "400 Bad Request",
-            401 => "401 Unauthorized",
-            403 => "403 Forbidden",
-            404 => "404 Not Found",
-            405 => "405 Method Not Allowed",
-            408 => "408 Request Timeout",
-            418 => "418 I'm a teapot",
-            429 => "429 Too Many Requests",
-            500 => "500 Internal Server Error",
-            501 => "501 Not Implemented",
-            503 => "503 Service Unavailable",
-            504 => "504 Gateway Timeout",
-            _ => other_code.as_str(),
-        };
-        if resp.status().is_client_error() {
-            println!("Nope. ({})", &code_msg);
-            guesses.push(s);
-            write_guesses(guesses.to_owned())?;
-        }
-        else if resp.status().is_server_error() {
+    terminal.clear()?;
 
-            println!("Someone fucked the server. ({})", &code_msg);
-        }
-        else {
-            println!("HOLY SHIT. PASSWORD: {}", &s);
+    loop {
+        terminal.draw(|f| ui::draw(f, &mut app))?;
+        if let Event::Input(input) = events.next()? {
+            match input {
+                CEvent::Key(k) => {
+                    match k.code {
+                        KeyCode::Enter => {
+                            request(client.to_owned(), &mut app).await?;
+                        }
+                        KeyCode::Backspace => {
+                            app.input.pop();
+                        }
+                        KeyCode::Char(c) => {
+                            if c == 'c' && k.modifiers.contains(KeyModifiers::CONTROL) {
+                                break;
+                            }
+                            else {
+                                app.input.push(c);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+                // CEvent::Key(KeyCode::Enter.into()) => {request(client, &mut app).await?;}
+                // CEvent::Key(KeyCode::Backspace.into()) => {app.input.pop();}
+                // CEvent::Key(KeyCode::Char(c).into()) => {app.input.push(c);}
+                // _ => {}
+            }
         }
     }
+    terminal.clear()?;
+
+    disable_raw_mode()?;
     Ok(())
 }
