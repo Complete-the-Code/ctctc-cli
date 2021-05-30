@@ -38,6 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
+        ::std::process::exit(0);
     })?;
     while running.load(Ordering::SeqCst) {
         print!("> ");
