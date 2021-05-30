@@ -80,6 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if resp.status().is_client_error() {
             println!("Nope. ({})", &code_msg);
             guesses.push(s);
+            write_guesses(guesses)?;
         }
         else if resp.status().is_server_error() {
 
@@ -89,6 +90,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("HOLY SHIT. PASSWORD: {}", &s);
         }
     }
-    write_guesses(guesses)?;
     Ok(())
 }
