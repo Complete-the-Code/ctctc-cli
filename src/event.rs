@@ -51,14 +51,6 @@ impl Events {
                     }
                     else {}
                 }
-                // for evt in stdin.next() {
-                //     if let Ok(key) = evt {
-                //         if let Err(err) = tx.send(Event::Input(key)) {
-                //             eprintln!("{}", err);
-                //             return;
-                //         }
-                //     }
-                // }
             })
         };
         let _tick_handle = {

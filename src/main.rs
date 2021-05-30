@@ -122,10 +122,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
                 _ => {}
-                // CEvent::Key(KeyCode::Enter.into()) => {request(client, &mut app).await?;}
-                // CEvent::Key(KeyCode::Backspace.into()) => {app.input.pop();}
-                // CEvent::Key(KeyCode::Char(c).into()) => {app.input.push(c);}
-                // _ => {}
             }
         }
     }
