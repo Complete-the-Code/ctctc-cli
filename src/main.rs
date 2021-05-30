@@ -38,56 +38,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
-        ::std::process::exit(0);
+        std::process::exit(0);
     })?;
     while running.load(Ordering::SeqCst) {
         print!("> ");
         io::stdout().flush()?;
-        let mut s: String = try_read!("{}\n")?;
-        s = s.trim().to_string();
-        if s.is_empty() {
+
+        let mut password_try: String = try_read!("{}\n")?;
+        password_try = password_try.trim().to_string();
+
+        if password_try.is_empty() {
             std::thread::sleep(std::time::Duration::from_millis(50));
             continue
-        }
-        else if guesses.contains(&s) {
+        } else if guesses.contains(&password_try) {
             println!("Already guessed, dipshit.");
             continue
         }
 
         let resp = client.post("https://completethecodetwo.cards/pw")
-            .body(s.to_owned())
+            .body(password_try.to_owned())
             .header("Content-Type", "text/plain")
             .send()
             .await?;
 
-        let code_str = resp.status().as_u16();
-        let other_code = format!("Some other code: {}", code_str);
-        let code_msg: &str = match resp.status().as_u16() {
-            400 => "400 Bad Request",
-            401 => "401 Unauthorized",
-            403 => "403 Forbidden",
-            404 => "404 Not Found",
-            405 => "405 Method Not Allowed",
-            408 => "408 Request Timeout",
-            418 => "418 I'm a teapot",
-            429 => "429 Too Many Requests",
-            500 => "500 Internal Server Error",
-            501 => "501 Not Implemented",
-            503 => "503 Service Unavailable",
-            504 => "504 Gateway Timeout",
-            _ => other_code.as_str(),
-        };
-        if resp.status().is_client_error() {
-            println!("Nope. ({})", &code_msg);
-            guesses.push(s);
-            write_guesses(guesses.to_owned())?;
-        }
-        else if resp.status().is_server_error() {
-
-            println!("Someone fucked the server. ({})", &code_msg);
-        }
-        else {
-            println!("HOLY SHIT. PASSWORD: {}", &s);
+        match resp.status() {
+            denied_status if denied_status.as_u16() == 403 => {
+                println!("Nope. 403 Forbidden");
+                guesses.push(password_try);
+                write_guesses(guesses.to_owned())?;
+            },
+            success_status if success_status.is_success() => {
+                println!("HOLY SHIT. PASSWORD: {}", &password_try);
+            },
+            _other_status => {
+                let mut _other_code_string = String::new();
+                let code_msg: &str = match resp.status().as_u16() {
+                    400 => "400 Bad Request",
+                    401 => "401 Unauthorized",
+                    404 => "404 Not Found",
+                    405 => "405 Method Not Allowed",
+                    408 => "408 Request Timeout",
+                    418 => "418 I'm a teapot",
+                    429 => "429 Too Many Requests",
+                    500 => "500 Internal Server Error",
+                    501 => "501 Not Implemented",
+                    503 => "503 Service Unavailable",
+                    504 => "504 Gateway Timeout",
+                    other_code => {
+                        _other_code_string = format!("Some other code: {}", other_code);
+                        &_other_code_string as &str
+                    },
+                };
+                println!("The server returned an unexpected response, this could mean that you found the password or that something's fucked up.\n\
+                Error Message: {}\n\
+                Tried Password. {}", code_msg, &password_try)
+            }
         }
     }
     Ok(())
