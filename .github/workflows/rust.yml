@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - [0-9]+.*
+      
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: taiki-e/github-actions/install-rust@main
+        with:
+          toolchain: stable
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          changelog: CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-assets:
+    strategy:
+      matrix:
+        include: 
+          - target: x86_64-unknown-linux-gnu
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: x86_64-unknown-linux-musl
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: taiki-e/github-actions/install-rust@main
+        with:
+          toolchain: stable
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: ctctc-cli
+          target: ${{ matrix.target }}
+          tar: all
+          zip: windows
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
