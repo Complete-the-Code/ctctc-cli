@@ -1,7 +1,7 @@
 use crate::App;
 use tui::{
     backend::Backend,
-    layout::{Constraint, Layout},
+    layout::{Constraint, Direction, Layout},
     style::{Style, Color},
     text::{Span, Spans},
     widgets::{
@@ -12,7 +12,8 @@ use tui::{
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App){
     let chunks = Layout::default()
-        .constraints([Constraint::Percentage(90), Constraint::Percentage(5), Constraint::Percentage(5)].as_ref())
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Ratio(3, 4), Constraint::Ratio(1, 8), Constraint::Ratio(1, 8)].as_ref())
         .split(f.size());
 
     let guesses: Vec<ListItem> = app

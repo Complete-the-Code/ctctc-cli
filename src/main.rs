@@ -80,7 +80,6 @@ async fn request(client: reqwest::Client, app: &mut App)
     Ok(())
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
@@ -101,8 +100,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         terminal.draw(|f| ui::draw(f, &mut app))?;
-        if let Event::Input(input) = events.next()? {
-            match input {
+        if let Event::Input(event) = events.next()? {
+            match event {
                 CEvent::Key(k) => {
                     match k.code {
                         KeyCode::Enter => {
