@@ -42,10 +42,10 @@ jobs:
             append: windows
           - target: x86_64-unknown-linux-musl
             append: musl
-    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.os || 'ubuntu-20.04' }}
     steps:
       - name: Install apt packages
-        run: sudo apt-get install pkg-config libssl-dev
+        run: sudo apt update && sudo apt upgrade -y && sudo apt-get install pkg-config libssl-dev
         if: ${{ contains(matrix.target, 'linux') }}
       - uses: actions/checkout@v2
       - uses: taiki-e/github-actions/install-rust@main
