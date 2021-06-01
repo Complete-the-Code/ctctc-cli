@@ -2,7 +2,7 @@ use crate::App;
 use tui::{
     backend::Backend,
     layout::{Constraint, Layout},
-    style::{Style},
+    style::{Style, Color},
     text::{Span, Spans},
     widgets::{
         Block, Borders, List, ListItem, Paragraph
@@ -14,6 +14,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App){
     let chunks = Layout::default()
         .constraints([Constraint::Percentage(90), Constraint::Percentage(5), Constraint::Percentage(5)].as_ref())
         .split(f.size());
+
     let guesses: Vec<ListItem> = app
         .guesses
         .iter()
@@ -28,8 +29,17 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App){
         List::new(guesses).block(Block::default().borders(Borders::ALL).title("Guesses"));
     f.render_widget(guesses, chunks[0]);
 
+    let mut color = match app.return_code {
+        x if x >= 400 && x < 500 => Color::Red,
+        x if x >= 500 => Color::Yellow,
+        x if x >= 200 && x < 400 => Color::Green,
+        _ => Color::White,
+    };
+    if app.last_return == "Already guessed, dipshit." {
+        color = Color::Red;
+    }
     let res = Paragraph::new(app.last_return.as_ref())
-        .style(Style::default())
+        .style(Style::default().fg(color))
         .block(Block::default().borders(Borders::ALL).title("Last Return Code"));
     f.render_widget(res, chunks[1]);
 
