@@ -40,8 +40,6 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             append: windows
-          - target: x86_64-unknown-linux-musl
-            append: musl
     runs-on: ${{ matrix.os || 'ubuntu-20.04' }}
     steps:
       - name: Install apt packages
