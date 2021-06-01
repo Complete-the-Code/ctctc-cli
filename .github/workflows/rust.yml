@@ -33,13 +33,18 @@ jobs:
       matrix:
         include: 
           - target: x86_64-unknown-linux-gnu
+            append: gnu
           - target: x86_64-apple-darwin
             os: macos-latest
+            append: macos
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-          - target: x86_64-unknown-linux-musl
-    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+            append: windows
+    runs-on: ${{ matrix.os || 'ubuntu-20.04' }}
     steps:
+      - name: Install apt packages
+        run: sudo apt update && sudo apt upgrade -y && sudo apt-get install pkg-config libssl-dev
+        if: ${{ contains(matrix.target, 'linux') }}
       - uses: actions/checkout@v2
       - uses: taiki-e/github-actions/install-rust@main
         with:
