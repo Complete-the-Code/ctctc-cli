@@ -51,6 +51,7 @@ async fn request(client: reqwest::Client, app: &mut App)
 
 
 
+    app.return_code = resp.status().as_u16();
     let code_str = resp.status().as_str().to_string();
 
     let other_code = format!("No fucking clue. {}", code_str);
