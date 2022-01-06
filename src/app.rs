@@ -17,10 +17,10 @@ impl Default for App {
 }
 
 impl App {
-    pub fn new(guesses: Vec<String>) -> App {
+    pub fn new() -> App {
         App {
             input: String::new(),
-            guesses,
+            guesses: Vec::new(),
             last_return: String::new(),
             return_code: 0,
         }
