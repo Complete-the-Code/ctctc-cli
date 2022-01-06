@@ -2,32 +2,36 @@ use crate::App;
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
-    style::{Style, Color},
+    style::{Color, Style},
     text::{Span, Spans},
-    widgets::{
-        Block, Borders, List, ListItem, Paragraph
-    },
+    widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App){
+pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Ratio(3, 4), Constraint::Ratio(1, 8), Constraint::Ratio(1, 8)].as_ref())
+        .constraints(
+            [
+                Constraint::Ratio(3, 4),
+                Constraint::Ratio(1, 8),
+                Constraint::Ratio(1, 8),
+            ]
+            .as_ref(),
+        )
         .split(f.size());
 
     let guesses: Vec<ListItem> = app
         .guesses
         .iter()
         .enumerate()
-        .map(|(i, g)| {
-            let content = vec![Spans::from(Span::raw(format!("{}: {}", i, g)))];
+        .map(|(_i, g)| {
+            let content = vec![Spans::from(Span::raw(g))];
             ListItem::new(content)
         })
         .collect();
 
-    let guesses =
-        List::new(guesses).block(Block::default().borders(Borders::ALL).title("Guesses"));
+    let guesses = List::new(guesses).block(Block::default().borders(Borders::ALL).title("Guesses"));
     f.render_widget(guesses, chunks[0]);
 
     let mut color = match app.return_code {
@@ -41,7 +45,11 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App){
     }
     let res = Paragraph::new(app.last_return.as_ref())
         .style(Style::default().fg(color))
-        .block(Block::default().borders(Borders::ALL).title("Last Return Code"));
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Last Return Code"),
+        );
     f.render_widget(res, chunks[1]);
 
     let p = Paragraph::new(app.input.as_ref())

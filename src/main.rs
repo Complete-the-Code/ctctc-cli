@@ -5,51 +5,25 @@ mod ui;
 use crate::app::App;
 use crate::event::{Event, Events};
 use crossterm::{
-    event::{
-        Event as CEvent,
-        KeyCode,
-        KeyModifiers},
+    event::{Event as CEvent, KeyCode, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use reqwest;
-use std::{
-    error::Error,
-    fs::{File, OpenOptions},
-    io::{self, prelude::*, stdout, BufReader, Write},
-};
+use std::{error::Error, io::stdout};
 use tui::{backend::CrosstermBackend, Terminal};
 
-fn read_guesses() -> io::Result<Vec<String>> {
-    BufReader::new(File::open("guesses.txt")?).lines().collect()
-}
-
-fn write_guesses(guesses: Vec<String>) -> io::Result<()> {
-    let mut f = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open("guesses.txt")?;
-    for line in guesses {
-        if !line.is_empty() {
-            write!(f, "{}", format!("{}\n", line.as_str()))?;
-        }
-    }
-    Ok(())
-}
-
-async fn request(client: reqwest::Client, app: &mut App)
-    -> Result<(), Box<dyn Error>> {
+async fn request(client: reqwest::Client, app: &mut App) -> Result<(), Box<dyn Error>> {
     let guess: String = app.input.drain(..).collect();
     if app.guesses.contains(&guess) {
         app.last_return = "Already guessed, dipshit.".to_string();
-        return Ok(())
+        return Ok(());
     }
-    let resp = client.post("https://completethecodetwo.cards/pw")
+    let resp = client
+        .post("https://ctc2.zevaryx.com/pw")
         .body(guess.to_owned())
         .header("Content-Type", "text/plain")
         .send()
         .await?;
-
-
 
     app.return_code = resp.status().as_u16();
     let code_str = resp.status().as_str().to_string();
@@ -74,8 +48,9 @@ async fn request(client: reqwest::Client, app: &mut App)
     app.last_return = code_msg.to_string();
 
     if resp.status().is_client_error() {
-        app.guesses.push(guess);
-        write_guesses(app.guesses.to_owned())?;
+        let response = resp.text().await?;
+        let message = format!("{}: {}", guess, response);
+        app.guesses.push(message);
     }
     Ok(())
 }
@@ -83,10 +58,6 @@ async fn request(client: reqwest::Client, app: &mut App)
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let client = reqwest::Client::new();
-    let guesses: Vec<String> = match read_guesses() {
-        Ok(g) => g,
-        Err(_) => Vec::new()
-    };
 
     enable_raw_mode()?;
     let stdout = stdout();
@@ -94,7 +65,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let events = Events::new();
-    let mut app = App::new(guesses);
+    let mut app = App::new();
 
     terminal.clear()?;
 
@@ -102,25 +73,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         terminal.draw(|f| ui::draw(f, &mut app))?;
         if let Event::Input(event) = events.next()? {
             match event {
-                CEvent::Key(k) => {
-                    match k.code {
-                        KeyCode::Enter => {
-                            request(client.to_owned(), &mut app).await?;
-                        }
-                        KeyCode::Backspace => {
-                            app.input.pop();
-                        }
-                        KeyCode::Char(c) => {
-                            if c == 'c' && k.modifiers.contains(KeyModifiers::CONTROL) {
-                                break;
-                            }
-                            else {
-                                app.input.push(c);
-                            }
-                        }
-                        _ => {}
+                CEvent::Key(k) => match k.code {
+                    KeyCode::Enter => {
+                        request(client.to_owned(), &mut app).await?;
                     }
-                }
+                    KeyCode::Backspace => {
+                        app.input.pop();
+                    }
+                    KeyCode::Char(c) => {
+                        if c == 'c' && k.modifiers.contains(KeyModifiers::CONTROL) {
+                            break;
+                        } else {
+                            app.input.push(c);
+                        }
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
         }
